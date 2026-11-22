@@ -1,9 +1,21 @@
 function initializeApp() {
     const toggle = document.getElementById('menuToggle');
     const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+
     if (toggle && sidebar) {
         toggle.addEventListener('click', function () {
-            sidebar.classList.toggle('open');
+            const isOpen = sidebar.classList.toggle('open');
+            if (backdrop) {
+                backdrop.classList.toggle('open', isOpen);
+            }
+        });
+    }
+
+    if (backdrop && sidebar) {
+        backdrop.addEventListener('click', function () {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('open');
         });
     }
 

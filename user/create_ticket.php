@@ -122,6 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 require __DIR__ . '/../includes/header.php';
 ?>
 
+<div class="user-page">
+
 <div class="welcome-row">
     <div>
         <h2>Create Support Ticket</h2>
@@ -232,6 +234,8 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
     </form>
+
+</div>
 
 </div>
 

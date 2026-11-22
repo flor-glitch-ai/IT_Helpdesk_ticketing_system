@@ -325,376 +325,258 @@ $pageTitle = 'Ticket Details';
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="welcome-row">
-    <div>
-        <h2>Ticket Details</h2>
-        <p class="muted">
-            Review the request, manage its status, and communicate with the requester.
-        </p>
+<div class="staff-page">
+
+    <div class="back-row">
+        <a class="text-link" href="tickets.php">← Back to Tickets</a>
+        <span class="ticket-no"><?= e($ticket['ticket_number']) ?></span>
     </div>
 
-    <a href="tickets.php" class="btn secondary">
-        ← Back to Tickets
-    </a>
-</div>
+    <?php if ($error): ?>
+        <div class="alert error" role="alert"><?= e($error) ?></div>
+    <?php endif; ?>
 
-<?php if ($error): ?>
-    <div class="alert error">
-        <?= e($error) ?>
-    </div>
-<?php endif; ?>
+    <div class="ticket-layout">
 
-<div class="section-heading">
-    <div>
-        <h2><?= e($ticket['title']) ?></h2>
-        <p class="muted">
-            Ticket No.:
-            <strong><?= e($ticket['ticket_number']) ?></strong>
-        </p>
-    </div>
+        <!-- MAIN COLUMN -->
+        <div class="main-column">
 
-    <span class="status">
-        <?= e($ticket['status']) ?>
-    </span>
-</div>
-
-<div class="detail-grid">
-
-    <div class="main-column">
-
-        <!-- Ticket Information -->
-        <div class="table-card" style="padding:24px;">
-
-            <h3>Ticket Information</h3>
-
-            <div class="detail-list">
-
-                <div class="detail-item">
-                    <span class="muted">Requester</span>
-                    <strong><?= e($ticket['requester'] ?? 'Unknown') ?></strong>
-                </div>
-
-                <div class="detail-item">
-                    <span class="muted">Requester Email</span>
-                    <strong><?= e($ticket['requester_email'] ?? 'Not available') ?></strong>
-                </div>
-
-                <div class="detail-item">
-                    <span class="muted">Category</span>
-                    <strong><?= e($ticket['category']) ?></strong>
-                </div>
-
-                <div class="detail-item">
-                    <span class="muted">Priority</span>
-                    <strong>
-                        <span class="priority <?= e(strtolower($ticket['priority'])) ?>">
-                            <?= e($ticket['priority']) ?>
-                        </span>
-                    </strong>
-                </div>
-
-                <div class="detail-item">
-                    <span class="muted">Assigned To</span>
-                    <strong>
-                        <?= e($ticket['assignee'] ?: 'Unassigned') ?>
-                    </strong>
-                </div>
-
-                <div class="detail-item">
-                    <span class="muted">Date Submitted</span>
-                    <strong>
-                        <?= e(date('M j, Y h:i A', strtotime($ticket['created_at']))) ?>
-                    </strong>
-                </div>
-
-                <div class="detail-item">
-                    <span class="muted">Last Updated</span>
-                    <strong>
-                        <?= e(date('M j, Y h:i A', strtotime($ticket['updated_at']))) ?>
-                    </strong>
-                </div>
-
-            </div>
-
-            <hr>
-
-            <h3>Description</h3>
-
-            <div class="ticket-description">
-                <?= nl2br(e($ticket['description'])) ?>
-            </div>
-
-        </div>
-
-        <!-- Claim Ticket -->
-        <?php if ($isUnassigned): ?>
-
-            <div class="table-card" style="padding:24px; margin-top:20px;">
-
-                <h3>Unassigned Ticket</h3>
-
-                <p class="muted">
-                    This ticket has not yet been assigned to an IT Staff member.
-                    You may claim it to start working on the request.
-                </p>
-
-                <form method="POST">
-
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="<?= e(csrf_token()) ?>"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="claim"
-                    >
-
-                    <button
-                        type="submit"
-                        class="btn primary"
-                        onclick="return confirm('Do you want to claim this ticket?');"
-                    >
-                        Claim This Ticket
-                    </button>
-
-                </form>
-
-            </div>
-
-        <?php endif; ?>
-
-        <!-- Update Status -->
-        <?php if ($isAssignedToMe && !$isCompleted): ?>
-
-            <div class="table-card" style="padding:24px; margin-top:20px;">
-
-                <h3>Update Ticket Status</h3>
-
-                <p class="muted">
-                    Select the current progress of this support request.
-                </p>
-
-                <form method="POST" class="form-stack">
-
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="<?= e(csrf_token()) ?>"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="update_status"
-                    >
-
-                    <label>
-                        Ticket Status
-
-                        <select name="status" required>
-
-                            <?php foreach ($allowedStatuses as $status): ?>
-
-                                <option
-                                    value="<?= e($status) ?>"
-                                    <?= $ticket['status'] === $status ? 'selected' : '' ?>
-                                >
-                                    <?= e($status) ?>
-                                </option>
-
-                            <?php endforeach; ?>
-
-                        </select>
-                    </label>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn primary">
-                            Save Status
-                        </button>
+            <!-- Title & Description -->
+            <div class="form-card">
+                <div class="ticket-title-row">
+                    <div>
+                        <span class="eyebrow"><?= e($ticket['category'] ?? 'Support Request') ?></span>
+                        <h2><?= e($ticket['title']) ?></h2>
+                        <p class="muted">
+                            Submitted by <?= e($ticket['requester'] ?? 'Unknown') ?>
+                            · <?= e(date('M j, Y g:i A', strtotime($ticket['created_at']))) ?>
+                        </p>
                     </div>
-
-                </form>
-
-            </div>
-
-        <?php elseif ($isCompleted): ?>
-
-            <div class="alert" style="margin-top:20px;">
-                This ticket has been marked as <?= e($ticket['status']) ?>.
-            </div>
-
-        <?php endif; ?>
-
-        <!-- Conversation -->
-        <div class="table-card" style="padding:24px; margin-top:20px;">
-
-            <div class="section-heading">
-                <div>
-                    <h3>Conversation</h3>
-                    <p class="muted">
-                        Messages between the requester and IT Staff.
-                    </p>
+                    <span class="priority <?= e(strtolower($ticket['priority'])) ?>">
+                        <?= e($ticket['priority']) ?>
+                    </span>
                 </div>
+
+                <div class="description"><?= nl2br(e($ticket['description'])) ?></div>
             </div>
 
-            <?php if (!$comments): ?>
-
-                <p class="empty">
-                    No comments have been added yet.
-                </p>
-
-            <?php else: ?>
+            <!-- Conversation -->
+            <div class="form-card">
+                <div class="card-heading">
+                    <h2>Conversation</h2>
+                    <p>Messages between the requester and IT Staff.</p>
+                </div>
 
                 <div class="comment-list">
+                    <?php if (!$comments): ?>
+                        <p class="empty">No comments have been added yet.</p>
+                    <?php endif; ?>
 
                     <?php foreach ($comments as $comment): ?>
-
-                        <div class="comment-item">
-
-                            <div class="comment-header">
-
-                                <strong>
-                                    <?= e($comment['commenter']) ?>
-                                </strong>
-
-                                <span class="muted">
-                                    <?= e($comment['commenter_role'] ?? 'User') ?>
-                                </span>
-
-                                <small class="muted">
-                                    <?= e(date('M j, Y h:i A', strtotime($comment['created_at']))) ?>
-                                </small>
-
+                        <div class="comment">
+                            <div class="comment-avatar" aria-hidden="true">
+                                <?= e(strtoupper(substr($comment['commenter'] ?: 'U', 0, 1))) ?>
                             </div>
 
                             <div class="comment-body">
-                                <?= nl2br(e($comment['comment'])) ?>
+                                <div class="comment-meta">
+                                    <strong><?= e($comment['commenter'] ?: 'Unknown User') ?></strong>
+                                    <span><?= e(ucwords(str_replace('_', ' ', $comment['commenter_role'] ?? 'User'))) ?> · <?= e(date('M j, Y g:i A', strtotime($comment['created_at']))) ?></span>
+                                </div>
+                                <p><?= nl2br(e($comment['comment'])) ?></p>
                             </div>
-
                         </div>
-
                     <?php endforeach; ?>
-
                 </div>
 
-            <?php endif; ?>
+                <!-- Add Comment Form -->
+                <?php if ($isAssignedToMe && !$isCompleted): ?>
+                    <form method="POST" class="form-stack comment-form">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                        <input type="hidden" name="action" value="comment">
 
-        </div>
+                        <label>
+                            Send a message
+                            <textarea
+                                name="comment"
+                                rows="4"
+                                maxlength="5000"
+                                required
+                                placeholder="Write an update or ask the requester for details..."
+                            ></textarea>
+                        </label>
 
-        <!-- Add Comment -->
-        <?php if ($isAssignedToMe && !$isCompleted): ?>
-
-            <div class="table-card" style="padding:24px; margin-top:20px;">
-
-                <h3>Send a Message</h3>
-
-                <p class="muted">
-                    Add an update or ask the requester for additional information.
-                </p>
-
-                <form method="POST" class="form-stack">
-
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="<?= e(csrf_token()) ?>"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="comment"
-                    >
-
-                    <label>
-                        Message
-
-                        <textarea
-                            name="comment"
-                            rows="5"
-                            maxlength="5000"
-                            required
-                            placeholder="Type your message here..."
-                        ></textarea>
-                    </label>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn primary">
-                            Send Message
-                        </button>
+                        <div class="form-actions">
+                            <button type="submit" class="btn primary">Send Message</button>
+                        </div>
+                    </form>
+                <?php elseif ($isCompleted): ?>
+                    <div class="alert">
+                        This ticket is completed. Comments are no longer available.
                     </div>
-
-                </form>
-
+                <?php elseif ($isUnassigned): ?>
+                    <p class="muted">
+                        Claim this ticket to communicate with the requester.
+                    </p>
+                <?php endif; ?>
             </div>
 
-        <?php endif; ?>
-
-        <!-- Ticket History -->
-        <div class="table-card" style="padding:24px; margin-top:20px;">
-
-            <h3>Ticket History</h3>
-
-            <?php if (!$historyRecords): ?>
-
-                <p class="empty">
-                    No history records available.
-                </p>
-
-            <?php else: ?>
-
-                <div class="table-scroll">
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Changed By</th>
-                                <th>Field</th>
-                                <th>Previous Value</th>
-                                <th>New Value</th>
-                                <th>Date</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            <?php foreach ($historyRecords as $history): ?>
-
-                                <tr>
-                                    <td>
-                                        <?= e($history['changed_by_name'] ?? 'Unknown') ?>
-                                    </td>
-
-                                    <td>
-                                        <?= e(ucwords(str_replace('_', ' ', $history['field_changed']))) ?>
-                                    </td>
-
-                                    <td>
-                                        <?= e($history['old_value'] ?? '-') ?>
-                                    </td>
-
-                                    <td>
-                                        <?= e($history['new_value'] ?? '-') ?>
-                                    </td>
-
-                                    <td>
-                                        <?= e(date('M j, Y h:i A', strtotime($history['created_at']))) ?>
-                                    </td>
-                                </tr>
-
-                            <?php endforeach; ?>
-
-                        </tbody>
-                    </table>
-
+            <!-- Ticket History -->
+            <div class="form-card">
+                <div class="card-heading">
+                    <h2>Ticket History</h2>
+                    <p>Recorded changes for this ticket.</p>
                 </div>
 
-            <?php endif; ?>
+                <?php if (!$historyRecords): ?>
+                    <p class="empty">No history records available.</p>
+                <?php else: ?>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Changed By</th>
+                                    <th>Field</th>
+                                    <th>Previous Value</th>
+                                    <th>New Value</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <?php foreach ($historyRecords as $history): ?>
+                                    <tr>
+                                        <td><strong><?= e($history['changed_by_name'] ?? 'Unknown') ?></strong></td>
+                                        <td><?= e(ucwords(str_replace('_', ' ', $history['field_changed']))) ?></td>
+                                        <td><?= e($history['old_value'] ?? '—') ?></td>
+                                        <td><?= e($history['new_value'] ?? '—') ?></td>
+                                        <td><?= e(date('M j, Y g:i A', strtotime($history['created_at']))) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
 
         </div>
+
+        <!-- SIDE COLUMN -->
+        <aside class="side-column">
+
+            <!-- Ticket Information -->
+            <div class="form-card">
+                <h3>Ticket Information</h3>
+
+                <div class="detail-pair">
+                    <span>Ticket Number</span>
+                    <strong><?= e($ticket['ticket_number']) ?></strong>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Status</span>
+                    <span class="status <?= e(strtolower(str_replace([' ', '_'], '-', $ticket['status']))) ?>">
+                        <?= e($ticket['status']) ?>
+                    </span>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Priority</span>
+                    <span class="priority <?= e(strtolower($ticket['priority'])) ?>">
+                        <?= e($ticket['priority']) ?>
+                    </span>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Category</span>
+                    <strong><?= e($ticket['category']) ?></strong>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Requester</span>
+                    <strong><?= e($ticket['requester'] ?? 'Unknown') ?></strong>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Requester Email</span>
+                    <strong><?= e($ticket['requester_email'] ?? 'Not available') ?></strong>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Assigned To</span>
+                    <strong><?= e($ticket['assignee'] ?: 'Unassigned') ?></strong>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Date Submitted</span>
+                    <strong><?= e(date('M j, Y g:i A', strtotime($ticket['created_at']))) ?></strong>
+                </div>
+
+                <div class="detail-pair">
+                    <span>Last Updated</span>
+                    <strong><?= e(date('M j, Y g:i A', strtotime($ticket['updated_at']))) ?></strong>
+                </div>
+            </div>
+
+            <!-- Manage Ticket -->
+            <div class="form-card">
+                <h3>Manage Ticket</h3>
+
+                <?php if ($isUnassigned): ?>
+                    <p class="muted" style="margin-bottom:15px;">
+                        This ticket is currently unassigned. You can claim it to take ownership.
+                    </p>
+
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                        <input type="hidden" name="action" value="claim">
+
+                        <button
+                            type="submit"
+                            class="btn primary full"
+                            onclick="return confirm('Do you want to claim this ticket?');"
+                        >
+                            Claim This Ticket
+                        </button>
+                    </form>
+
+                <?php elseif ($isAssignedToMe && !$isCompleted): ?>
+                    <form method="POST" class="form-stack">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                        <input type="hidden" name="action" value="update_status">
+
+                        <label>
+                            Update Status
+                            <select name="status" required>
+                                <?php foreach ($allowedStatuses as $status): ?>
+                                    <option
+                                        value="<?= e($status) ?>"
+                                        <?= $ticket['status'] === $status ? 'selected' : '' ?>
+                                    >
+                                        <?= e($status) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+
+                        <button type="submit" class="btn primary full">
+                            Save Status
+                        </button>
+                    </form>
+
+                <?php elseif ($isCompleted): ?>
+                    <div class="alert" style="margin-bottom:0;">
+                        This ticket is marked as <?= e($ticket['status']) ?>.
+                    </div>
+
+                <?php else: ?>
+                    <p class="muted">
+                        Assigned to <?= e($ticket['assignee']) ?>.
+                    </p>
+                <?php endif; ?>
+            </div>
+
+        </aside>
 
     </div>
 
