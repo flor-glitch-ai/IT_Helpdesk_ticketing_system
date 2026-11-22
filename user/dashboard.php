@@ -97,10 +97,7 @@ $pageTitle = 'User Dashboard';
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<link rel="stylesheet"
-      href="/erp-helpdesk/assets/css/user-dashboard.css">
-
-<main class="user-dashboard">
+<div class="user-page user-dashboard">
 
     <!-- =====================================
          WELCOME SECTION
@@ -470,6 +467,6 @@ require __DIR__ . '/../includes/header.php';
 
     </section>
 
-</main>
+</div>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

@@ -86,148 +86,160 @@ $pageTitle = 'IT Staff Dashboard';
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="welcome-row">
-    <div>
-        <h2>Hello, <?= e($user['name']) ?>.</h2>
-        <p class="muted">
-            Here's your technical support activity.
-        </p>
-    </div>
+<div class="staff-page staff-dashboard">
 
-    <a href="tickets.php" class="btn primary">
-        View Tickets
-    </a>
-</div>
+    <section class="staff-hero">
+        <span class="staff-hero-label">Technical Support Workspace</span>
+        <h2>Hello, <?= e($user['name']) ?>!</h2>
+        <p>Review assigned support requests, monitor ticket resolution, and assist users.</p>
+    </section>
 
-<div class="stats-grid">
-
-    <div class="stat-card">
-        <span class="stat-icon blue">▤</span>
-        <div>
-            <small>My Assigned Tickets</small>
-            <strong><?= $assigned ?></strong>
+    <section>
+        <div class="section-heading">
+            <div>
+                <h2>Overview</h2>
+                <p>Summary of your current support activity</p>
+            </div>
+            <a href="tickets.php" class="staff-view-all">View All Tickets →</a>
         </div>
-    </div>
 
-    <div class="stat-card">
-        <span class="stat-icon amber">◷</span>
-        <div>
-            <small>Active Tickets</small>
-            <strong><?= $active ?></strong>
+        <div class="staff-stats-grid">
+            <a href="tickets.php" class="staff-stat-card">
+                <div class="staff-stat-top">
+                    <span>Assigned Tickets</span>
+                    <span class="staff-stat-icon" aria-hidden="true">▤</span>
+                </div>
+                <h3><?= number_format($assigned) ?></h3>
+                <p>Tickets currently assigned to you</p>
+            </a>
+
+            <a href="tickets.php" class="staff-stat-card">
+                <div class="staff-stat-top">
+                    <span>Active Tickets</span>
+                    <span class="staff-stat-icon" aria-hidden="true">◷</span>
+                </div>
+                <h3><?= number_format($active) ?></h3>
+                <p>Assigned tickets needing attention</p>
+            </a>
+
+            <div class="staff-stat-card">
+                <div class="staff-stat-top">
+                    <span>Resolved Tickets</span>
+                    <span class="staff-stat-icon" aria-hidden="true">✓</span>
+                </div>
+                <h3><?= number_format($resolved) ?></h3>
+                <p>Successfully completed tickets</p>
+            </div>
+
+            <div class="staff-stat-card">
+                <div class="staff-stat-top">
+                    <span>Critical Tickets</span>
+                    <span class="staff-stat-icon" aria-hidden="true">!</span>
+                </div>
+                <h3><?= number_format($critical) ?></h3>
+                <p>Urgent tickets requiring action</p>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div class="stat-card">
-        <span class="stat-icon green">✓</span>
-        <div>
-            <small>Resolved Tickets</small>
-            <strong><?= $resolved ?></strong>
+    <section>
+        <div class="section-heading">
+            <div>
+                <h2>System Queue</h2>
+                <p>Requests waiting for technical staff assignment</p>
+            </div>
         </div>
-    </div>
 
-    <div class="stat-card">
-        <span class="stat-icon red">!</span>
-        <div>
-            <small>Critical Tickets</small>
-            <strong><?= $critical ?></strong>
+        <div class="staff-system-overview">
+            <a class="staff-system-item" href="tickets.php">
+                <div class="staff-system-icon" aria-hidden="true">?</div>
+                <div>
+                    <h3><?= number_format($unassigned) ?></h3>
+                    <p>Unassigned Active Tickets Awaiting Action</p>
+                </div>
+            </a>
         </div>
-    </div>
+    </section>
 
-</div>
-
-<div class="stats-grid">
-
-    <div class="stat-card">
-        <span class="stat-icon amber">!</span>
-        <div>
-            <small>Unassigned Tickets</small>
-            <strong><?= $unassigned ?></strong>
+    <section>
+        <div class="section-heading">
+            <div>
+                <h2>Recent Support Tickets</h2>
+                <p>Your assigned tickets and available unassigned requests</p>
+            </div>
+            <a href="tickets.php" class="staff-view-all">View All Tickets →</a>
         </div>
-    </div>
 
-</div>
+        <div class="table-card">
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticket No.</th>
+                            <th>Subject</th>
+                            <th>Requester</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
 
-<div class="section-heading">
-    <div>
-        <h2>Recent Support Tickets</h2>
-        <p class="muted">
-            Your assigned tickets and requests awaiting assignment.
-        </p>
-    </div>
+                    <tbody>
+                    <?php if (!$recent): ?>
+                        <tr>
+                            <td colspan="7" class="empty">
+                                No tickets currently available.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
 
-    <a href="tickets.php" class="text-link">
-        View All Tickets →
-    </a>
-</div>
+                    <?php foreach ($recent as $t): ?>
+                        <tr>
+                            <td class="ticket-no">
+                                <?= e($t['ticket_number']) ?>
+                            </td>
 
-<div class="table-card">
-<div class="table-scroll">
-<table>
-<thead>
-<tr>
-    <th>Ticket No.</th>
-    <th>Subject</th>
-    <th>Requester</th>
-    <th>Priority</th>
-    <th>Status</th>
-    <th>Created</th>
-    <th>Action</th>
-</tr>
-</thead>
+                            <td>
+                                <strong><?= e($t['title']) ?></strong>
+                                <?php if (!empty($t['category'])): ?>
+                                    <small class="table-sub">
+                                        <?= e($t['category']) ?>
+                                    </small>
+                                <?php endif; ?>
+                            </td>
 
-<tbody>
+                            <td><?= e($t['requester'] ?? 'Unknown') ?></td>
 
-<?php if (!$recent): ?>
-<tr>
-    <td colspan="7" class="empty">
-        No tickets available.
-    </td>
-</tr>
-<?php endif; ?>
+                            <td>
+                                <span class="priority <?= strtolower(e($t['priority'])) ?>">
+                                    <?= e($t['priority']) ?>
+                                </span>
+                            </td>
 
-<?php foreach ($recent as $t): ?>
-<tr>
-    <td class="ticket-no">
-        <?= e($t['ticket_number']) ?>
-    </td>
+                            <td>
+                                <span class="status <?= strtolower(str_replace([' ', '_'], '-', $t['status'])) ?>">
+                                    <?= e($t['status']) ?>
+                                </span>
+                            </td>
 
-    <td>
-        <strong><?= e($t['title']) ?></strong>
-        <small class="table-sub">
-            <?= e($t['category'] ?? '') ?>
-        </small>
-    </td>
+                            <td>
+                                <?= e(date('M j, Y', strtotime($t['created_at']))) ?>
+                            </td>
 
-    <td><?= e($t['requester'] ?? 'Unknown') ?></td>
+                            <td>
+                                <a class="text-link" href="ticket_view.php?id=<?= (int)$t['id'] ?>">
+                                    Open →
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
 
-    <td>
-        <span class="priority <?= strtolower(e($t['priority'])) ?>">
-            <?= e($t['priority']) ?>
-        </span>
-    </td>
-
-    <td>
-        <span class="status">
-            <?= e($t['status']) ?>
-        </span>
-    </td>
-
-    <td>
-        <?= e(date('M j, Y', strtotime($t['created_at']))) ?>
-    </td>
-
-    <td>
-        <a class="text-link"
-           href="ticket_view.php?id=<?= (int)$t['id'] ?>">
-            Open
-        </a>
-    </td>
-</tr>
-<?php endforeach; ?>
-
-</tbody>
-</table>
-</div>
 </div>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

@@ -1,0 +1,670 @@
+/* =========================================================
+   USER MODULE — SPECIFIC STYLESHEET
+   Extends shared.css with Customer Support Portal components.
+========================================================= */
+
+.user-page,
+.user-page * {
+    box-sizing: border-box;
+}
+
+.user-page {
+    width: 100%;
+    min-width: 0;
+    color: var(--text-primary);
+}
+
+.user-page.user-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    animation: userFadeIn 0.35s ease;
+}
+
+@keyframes userFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===========================================
+   1. USER WELCOME HERO
+=========================================== */
+
+.user-page .user-welcome {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 190px;
+    padding: 34px 38px;
+    overflow: hidden;
+    border: 1px solid rgba(117, 169, 214, 0.22);
+    border-radius: var(--radius-lg);
+    background:
+        radial-gradient(
+            circle at 90% 10%,
+            rgba(130, 191, 255, 0.12),
+            transparent 42%
+        ),
+        linear-gradient(135deg, #14355a, #183e68 60%, #1f5084 100%);
+    box-shadow: var(--shadow-card);
+}
+
+.user-page .welcome-content {
+    position: relative;
+    z-index: 2;
+    max-width: 780px;
+}
+
+.user-page .welcome-label,
+.user-page .section-label {
+    display: block;
+    color: var(--accent-light);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+}
+
+.user-page .user-welcome h2 {
+    margin: 10px 0 10px;
+    color: #ffffff;
+    font-size: clamp(23px, 2.8vw, 30px);
+    font-weight: 750;
+    letter-spacing: -0.3px;
+    line-height: 1.3;
+}
+
+.user-page .user-welcome p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.user-page .user-welcome-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 22px;
+    padding: 10px 22px;
+    border: 1px solid var(--accent-light);
+    border-radius: var(--radius-sm);
+    background: var(--accent-primary);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(75, 145, 209, 0.35);
+    transition: all var(--transition);
+}
+
+.user-page .user-welcome-btn:hover {
+    background: var(--accent-primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(75, 145, 209, 0.45);
+}
+
+.user-page .user-welcome-btn span {
+    font-size: 17px;
+    line-height: 1;
+}
+
+.user-page .welcome-decoration {
+    position: absolute;
+    top: -180px;
+    right: -60px;
+    width: 440px;
+    height: 440px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 45px rgba(255, 255, 255, 0.02),
+        0 0 0 90px rgba(255, 255, 255, 0.015);
+    pointer-events: none;
+}
+
+/* ===========================================
+   2. USER STATS GRID
+=========================================== */
+
+.user-page .user-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.user-page .user-stat-card {
+    position: relative;
+    min-width: 0;
+    padding: 22px 24px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(145deg, var(--bg-card), #142f4d);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition);
+}
+
+.user-page .user-stat-card:hover {
+    border-color: var(--border-strong);
+    background: linear-gradient(145deg, var(--bg-card-hover), #17375a);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-3px);
+}
+
+.user-page .user-stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.user-page .user-stat-top > span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.user-page .user-stat-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: rgba(75, 145, 209, 0.16);
+    color: var(--accent-light);
+    font-size: 18px;
+}
+
+.user-page .user-stat-icon.amber {
+    color: #fde68a;
+    background: rgba(251, 191, 36, 0.15);
+    border-color: rgba(251, 191, 36, 0.28);
+}
+
+.user-page .user-stat-icon.green {
+    color: #bbf7d0;
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.28);
+}
+
+.user-page .user-stat-icon.purple {
+    color: #c7d2fe;
+    background: rgba(129, 140, 248, 0.15);
+    border-color: rgba(129, 140, 248, 0.28);
+}
+
+.user-page .user-stat-card h3 {
+    margin: 16px 0 6px;
+    color: #ffffff;
+    font-size: 32px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+}
+
+.user-page .user-stat-card p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* ===========================================
+   3. CONTENT CARDS & RECENT TABLE
+=========================================== */
+
+.user-page .user-content-card {
+    min-width: 0;
+    padding: 26px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-card);
+}
+
+.user-page .user-card-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.user-page .user-view-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card-secondary);
+    color: var(--accent-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all var(--transition);
+}
+
+.user-page .user-view-all:hover {
+    border-color: var(--accent-primary);
+    background: var(--accent-primary);
+    color: #ffffff;
+    transform: translateX(2px);
+}
+
+.user-page .user-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    scrollbar-width: thin;
+}
+
+.user-page .user-data-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 12px;
+}
+
+.user-page .user-data-table th {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: #193957;
+    color: #b6cbe0;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.user-page .user-data-table td {
+    padding: 14px 16px;
+    border-top: 1px solid rgba(117, 169, 214, 0.08);
+    color: var(--text-secondary);
+    vertical-align: middle;
+}
+
+.user-page .user-data-table tbody tr:first-child td {
+    border-top: 0;
+}
+
+.user-page .user-data-table tbody tr:hover {
+    background: rgba(75, 145, 209, 0.08);
+}
+
+.user-page .user-ticket-number {
+    color: var(--accent-light);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.user-page .user-ticket-title {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.user-page .user-action-link {
+    color: var(--accent-light);
+    font-size: 12px;
+    font-weight: 700;
+    transition: color var(--transition);
+}
+
+.user-page .user-action-link:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+/* ===========================================
+   4. ACCOUNT & QUICK INFO
+=========================================== */
+
+.user-page .account-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.user-page .account-information {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.user-page .account-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: rgba(75, 145, 209, 0.16);
+    border: 1px solid var(--border-light);
+    color: var(--accent-light);
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.user-page .user-secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card-secondary);
+    color: var(--accent-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all var(--transition);
+}
+
+.user-page .user-secondary-btn:hover {
+    border-color: var(--accent-primary);
+    background: var(--accent-primary);
+    color: #ffffff;
+}
+
+.user-page .user-quick-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.user-page .quick-info-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(145deg, var(--bg-card), #142f4d);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition);
+}
+
+.user-page .quick-info-item:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
+}
+
+.user-page .quick-info-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    background: rgba(75, 145, 209, 0.16);
+    border: 1px solid var(--border-light);
+    color: var(--accent-light);
+    font-size: 18px;
+}
+
+.user-page .quick-info-item strong {
+    color: #ffffff;
+    font-size: 13px;
+    display: block;
+    margin-bottom: 3px;
+}
+
+.user-page .quick-info-item p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* ===========================================
+   5. PROFILE PAGE
+=========================================== */
+
+.user-page .profile-page {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.user-page .profile-intro {
+    margin-bottom: 24px;
+}
+
+.user-page .profile-intro h2 {
+    margin: 0 0 4px;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 750;
+    letter-spacing: -0.3px;
+}
+
+.user-page .profile-intro p {
+    color: var(--text-secondary);
+    margin: 0;
+    font-size: 13px;
+}
+
+.user-page .profile-banner {
+    background:
+        radial-gradient(circle at 90% 10%, rgba(130, 191, 255, 0.10), transparent 42%),
+        linear-gradient(135deg, #14355a, #183e68 60%, #1f5084 100%);
+    border: 1px solid rgba(117, 169, 214, 0.22);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-bottom: 26px;
+    box-shadow: var(--shadow-card);
+}
+
+.user-page .profile-avatar {
+    width: 74px;
+    height: 74px;
+    min-width: 74px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, #1f4f7f, #14355a);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 28px;
+    font-weight: 750;
+    box-shadow: 0 4px 16px rgba(3, 15, 30, 0.3);
+}
+
+.user-page .profile-banner-info h2 {
+    margin: 0 0 4px;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 750;
+}
+
+.user-page .profile-banner-info p {
+    margin: 0 0 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.user-page .profile-role {
+    display: inline-block;
+    background: rgba(75, 145, 209, 0.20);
+    border: 1px solid rgba(117, 169, 214, 0.25);
+    color: var(--accent-light);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+.user-page .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    align-items: start;
+}
+
+.user-page .profile-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 26px;
+    box-shadow: var(--shadow-card);
+    min-width: 0;
+}
+
+.user-page .profile-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.user-page .profile-card-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: var(--radius-md);
+    background: rgba(75, 145, 209, 0.16);
+    border: 1px solid var(--border-light);
+    color: var(--accent-light);
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+}
+
+.user-page .profile-card-header h3 {
+    margin: 0 0 4px;
+    color: #ffffff;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.user-page .profile-card-header p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.user-page .profile-form-group {
+    margin-bottom: 18px;
+}
+
+.user-page .profile-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.user-page .profile-form-group input {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: all var(--transition);
+}
+
+.user-page .profile-form-group input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    background: var(--bg-input-focus);
+}
+
+.user-page .profile-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.user-page .profile-submit {
+    width: 100%;
+    justify-content: center;
+    margin-top: 6px;
+}
+
+.user-page .profile-alert {
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    margin-bottom: 22px;
+    font-size: 13px;
+    border: 1px solid transparent;
+}
+
+.user-page .profile-alert.error {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    color: #ffc4c4;
+}
+
+.user-page .profile-alert.success {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: #bdf6d2;
+}
+
+.user-page .profile-security-note {
+    margin-top: 18px;
+    padding: 13px 16px;
+    background: rgba(16, 39, 68, 0.45);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* ===========================================
+   6. RESPONSIVE
+=========================================== */
+
+@media (max-width: 1100px) {
+    .user-page .user-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 850px) {
+    .user-page .profile-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .user-page .user-stats-grid,
+    .user-page .user-quick-info {
+        grid-template-columns: 1fr;
+    }
+
+    .user-page .user-welcome {
+        padding: 24px 20px;
+    }
+
+    .user-page .user-welcome h2 {
+        font-size: 21px;
+    }
+
+    .user-page .account-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
