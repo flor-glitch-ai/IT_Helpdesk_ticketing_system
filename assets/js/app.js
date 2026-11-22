@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function () {
+function initializeApp() {
     const toggle = document.getElementById('menuToggle');
     const sidebar = document.getElementById('sidebar');
     if (toggle && sidebar) {
@@ -14,4 +14,23 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
-});
+
+    document.querySelectorAll('[data-toggle-password]').forEach(function (toggle) {
+        const password = document.getElementById(toggle.getAttribute('aria-controls'));
+        if (!password) return;
+
+        toggle.addEventListener('click', function () {
+            const isVisible = password.type === 'text';
+            password.type = isVisible ? 'password' : 'text';
+            toggle.textContent = isVisible ? 'Show' : 'Hide';
+            toggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
+            toggle.setAttribute('aria-pressed', String(!isVisible));
+        });
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}

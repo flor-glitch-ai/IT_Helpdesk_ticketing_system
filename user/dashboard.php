@@ -1,4 +1,4 @@
- 
+
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
 
@@ -7,11 +7,11 @@ require_login();
 $pdo = db();
 $user = current_user();
 
-$role = strtolower(str_replace(
-    [' ', '-'],
-    '_',
-    trim($user['role'] ?? '')
-));
+/* =========================================
+   1. ACCESS CONTROL
+========================================= */
+
+$role = strtolower(trim($user['role'] ?? ''));
 
 if ($role !== 'user') {
     http_response_code(403);
@@ -20,356 +20,456 @@ if ($role !== 'user') {
 
 $userId = (int) $user['id'];
 
-/*
-|--------------------------------------------------------------------------
-| Dashboard Statistics
-|--------------------------------------------------------------------------
-*/
+/* =========================================
+   2. USER STATISTICS
+========================================= */
 
-$stmt = $pdo->prepare("
-    SELECT COUNT(*)
+$statsStmt = $pdo->prepare("
+    SELECT
+        COUNT(*) AS total,
+        COALESCE(SUM(
+            CASE
+                WHEN status NOT IN ('Resolved', 'Closed')
+                THEN 1 ELSE 0
+            END
+        ), 0) AS active,
+        COALESCE(SUM(
+            CASE WHEN status = 'Resolved'
+            THEN 1 ELSE 0 END
+        ), 0) AS resolved,
+        COALESCE(SUM(
+            CASE WHEN status = 'Closed'
+            THEN 1 ELSE 0 END
+        ), 0) AS closed
     FROM tickets
     WHERE requester_id = ?
 ");
-$stmt->execute([$userId]);
-$all = (int) $stmt->fetchColumn();
 
-$stmt = $pdo->prepare("
-    SELECT COUNT(*)
-    FROM tickets
-    WHERE requester_id = ?
-    AND status NOT IN ('Resolved', 'Closed')
-");
-$stmt->execute([$userId]);
-$active = (int) $stmt->fetchColumn();
+$statsStmt->execute([$userId]);
+$stats = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: [
+    'total' => 0,
+    'active' => 0,
+    'resolved' => 0,
+    'closed' => 0
+];
 
-$stmt = $pdo->prepare("
-    SELECT COUNT(*)
-    FROM tickets
-    WHERE requester_id = ?
-    AND status IN ('Resolved', 'Closed')
-");
-$stmt->execute([$userId]);
-$resolved = (int) $stmt->fetchColumn();
+/* =========================================
+   3. RECENT TICKETS
+========================================= */
 
-/*
-|--------------------------------------------------------------------------
-| Search Recent Tickets
-|--------------------------------------------------------------------------
-*/
-
-$search = trim($_GET['search'] ?? '');
-
-$sql = "
+$recentStmt = $pdo->prepare("
     SELECT
         t.id,
         t.ticket_number,
         t.title,
-        t.category,
         t.priority,
         t.status,
-        t.created_at
+        t.created_at,
+        CONCAT(s.first_name, ' ', s.last_name) AS assignee_name
     FROM tickets t
+    LEFT JOIN users s
+        ON s.id = t.assigned_to
     WHERE t.requester_id = ?
-";
+    ORDER BY t.created_at DESC
+    LIMIT 5
+");
 
-$params = [$userId];
+$recentStmt->execute([$userId]);
+$recentTickets = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-if ($search !== '') {
-    $sql .= "
-        AND (
-            t.ticket_number LIKE ?
-            OR t.title LIKE ?
-            OR t.category LIKE ?
-            OR t.priority LIKE ?
-            OR t.status LIKE ?
-        )
-    ";
+/* =========================================
+   4. USER INFORMATION
+========================================= */
 
-    $keyword = '%' . $search . '%';
+$firstName = trim($user['first_name'] ?? '');
+$lastName = trim($user['last_name'] ?? '');
 
-    $params = array_merge(
-        $params,
-        array_fill(0, 5, $keyword)
-    );
+$fullName = trim($firstName . ' ' . $lastName);
+
+if ($fullName === '') {
+    $fullName = $user['name'] ?? 'User';
 }
 
-$sql .= "
-    ORDER BY t.created_at DESC
-    LIMIT 8
-";
+$initial = strtoupper(substr($firstName ?: $fullName, 0, 1));
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-
-$recent = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$pageTitle = 'My Dashboard';
+$pageTitle = 'User Dashboard';
 
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<style>
-.dashboard-search {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-    max-width: 520px;
-}
+<link rel="stylesheet"
+      href="/erp-helpdesk/assets/css/user-dashboard.css">
 
-.dashboard-search input {
-    flex: 1;
-    min-width: 0;
-    height: 43px;
-    padding: 0 14px;
-    border: 1px solid #dce4ee;
-    border-radius: 7px;
-    background: #fff;
-    font-size: 13px;
-    outline: none;
-    box-sizing: border-box;
-}
+<main class="user-dashboard">
 
-.dashboard-search input:focus {
-    border-color: #386da8;
-    box-shadow: 0 0 0 3px rgba(56,109,168,.10);
-}
+    <!-- =====================================
+         WELCOME SECTION
+    ====================================== -->
 
-.dashboard-search button {
-    height: 43px;
-    padding: 0 20px;
-    border: none;
-    border-radius: 7px;
-    background: #173b67;
-    color: #fff;
-    font-weight: 600;
-    cursor: pointer;
-}
+    <section class="user-welcome">
 
-.dashboard-search button:hover {
-    background: #24558c;
-}
+        <div class="welcome-content">
 
-.search-clear {
-    color: #64748b;
-    font-size: 12px;
-    text-decoration: none;
-}
+            <span class="welcome-label">
+                IT SUPPORT PORTAL
+            </span>
 
-.search-clear:hover {
-    color: #173b67;
-}
+            <h2>
+                Welcome back, <?= e($fullName) ?>!
+            </h2>
 
-@media (max-width: 500px) {
-    .dashboard-search {
-        flex-wrap: wrap;
-    }
+            <p>
+                Manage your IT support requests and monitor
+                your ticket progress in one place.
+            </p>
 
-    .dashboard-search input {
-        width: 100%;
-    }
-}
-</style>
+            <a href="create_ticket.php" class="user-welcome-btn">
+                <span>+</span>
+                Submit New Ticket
+            </a>
 
-<!-- WELCOME SECTION -->
-
-<div class="welcome-row">
-
-    <div>
-        <h2>Hello, <?= e($user['name'] ?? 'User') ?>.</h2>
-
-        <p class="muted">
-            Welcome to your IT Help Desk portal.
-            Track and manage your support requests here.
-        </p>
-    </div>
-
-    <a href="create_ticket.php" class="btn primary">
-        + Create Ticket
-    </a>
-
-</div>
-
-
-<!-- STATISTICS -->
-
-<div class="stats-grid">
-
-    <div class="stat-card">
-        <span class="stat-icon blue">▤</span>
-
-        <div>
-            <small>My Total Tickets</small>
-            <strong><?= $all ?></strong>
         </div>
-    </div>
 
-    <div class="stat-card">
-        <span class="stat-icon amber">◷</span>
+        <div class="welcome-decoration"></div>
 
-        <div>
-            <small>Active Tickets</small>
-            <strong><?= $active ?></strong>
+    </section>
+
+
+    <!-- =====================================
+         DASHBOARD OVERVIEW
+    ====================================== -->
+
+    <section class="user-dashboard-section">
+
+        <div class="user-section-heading">
+
+            <div>
+                <span class="section-label">
+                    YOUR ACTIVITY
+                </span>
+
+                <h2>Dashboard Overview</h2>
+
+                <p>
+                    Summary of your IT support requests.
+                </p>
+            </div>
+
         </div>
-    </div>
 
-    <div class="stat-card">
-        <span class="stat-icon green">✓</span>
 
-        <div>
-            <small>Resolved / Closed</small>
-            <strong><?= $resolved ?></strong>
+        <!-- STATISTICS -->
+
+        <div class="user-stats-grid">
+
+            <!-- TOTAL TICKETS -->
+
+            <div class="user-stat-card">
+
+                <div class="user-stat-top">
+                    <span>Total Tickets</span>
+
+                    <div class="user-stat-icon blue">
+                        <span>▤</span>
+                    </div>
+                </div>
+
+                <h3>
+                    <?= (int) $stats['total'] ?>
+                </h3>
+
+                <p>All submitted support requests</p>
+
+            </div>
+
+
+            <!-- ACTIVE TICKETS -->
+
+            <div class="user-stat-card">
+
+                <div class="user-stat-top">
+                    <span>Active Tickets</span>
+
+                    <div class="user-stat-icon amber">
+                        <span>◷</span>
+                    </div>
+                </div>
+
+                <h3>
+                    <?= (int) $stats['active'] ?>
+                </h3>
+
+                <p>Tickets currently being handled</p>
+
+            </div>
+
+
+            <!-- RESOLVED -->
+
+            <div class="user-stat-card">
+
+                <div class="user-stat-top">
+                    <span>Resolved Tickets</span>
+
+                    <div class="user-stat-icon green">
+                        <span>✓</span>
+                    </div>
+                </div>
+
+                <h3>
+                    <?= (int) $stats['resolved'] ?>
+                </h3>
+
+                <p>Successfully resolved requests</p>
+
+            </div>
+
+
+            <!-- CLOSED -->
+
+            <div class="user-stat-card">
+
+                <div class="user-stat-top">
+                    <span>Closed Tickets</span>
+
+                    <div class="user-stat-icon purple">
+                        <span>▣</span>
+                    </div>
+                </div>
+
+                <h3>
+                    <?= (int) $stats['closed'] ?>
+                </h3>
+
+                <p>Completed and closed requests</p>
+
+            </div>
+
         </div>
-    </div>
 
-</div>
-
-
-<!-- RECENT TICKETS HEADING -->
-
-<div class="section-heading">
-
-    <div>
-        <h2>My Recent Tickets</h2>
-
-        <p class="muted">
-            Track the status of your latest support requests.
-        </p>
-    </div>
-
-    <a href="tickets.php" class="text-link">
-        View All My Tickets →
-    </a>
-
-</div>
+    </section>
 
 
-<!-- SEARCH BAR -->
+    <!-- =====================================
+         RECENT TICKETS
+    ====================================== -->
 
-<form method="GET" action="dashboard.php" class="dashboard-search">
+    <section class="user-content-card">
 
-    <input
-        type="search"
-        name="search"
-        placeholder="Search ticket number, subject, category..."
-        value="<?= e($search) ?>"
-    >
+        <div class="user-card-heading">
 
-    <button type="submit">
-        Search
-    </button>
+            <div>
+                <span class="section-label">
+                    SUPPORT REQUESTS
+                </span>
 
-    <?php if ($search !== ''): ?>
+                <h2>Recent Tickets</h2>
 
-        <a href="dashboard.php" class="search-clear">
-            Clear
-        </a>
+                <p>
+                    Keep track of your latest IT support requests.
+                </p>
+            </div>
 
-    <?php endif; ?>
+            <a href="tickets.php" class="user-view-all">
+                View All Tickets
+                <span>→</span>
+            </a>
 
-</form>
+        </div>
 
 
-<!-- TICKET TABLE -->
+        <?php if (empty($recentTickets)): ?>
 
-<div class="table-card">
+            <div class="user-empty-state">
 
-    <div class="table-scroll">
+                <div class="empty-icon">
+                    ▤
+                </div>
 
-        <table>
+                <h3>No Tickets Yet</h3>
 
-            <thead>
-                <tr>
-                    <th>Ticket No.</th>
-                    <th>Subject</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
+                <p>
+                    You haven't submitted any support requests.
+                    Create your first ticket to get started.
+                </p>
 
-            <tbody>
+                <a href="create_ticket.php" class="user-primary-btn">
+                    + Submit Your First Ticket
+                </a>
 
-                <?php if (empty($recent)): ?>
+            </div>
 
-                    <tr>
-                        <td colspan="6" class="empty">
+        <?php else: ?>
 
-                            <?php if ($search !== ''): ?>
-                                No tickets found matching
-                                "<?= e($search) ?>".
-                            <?php else: ?>
-                                You haven't created any support tickets yet.
-                            <?php endif; ?>
+            <div class="user-table-wrapper">
 
-                        </td>
-                    </tr>
+                <table class="user-data-table">
 
-                <?php else: ?>
-
-                    <?php foreach ($recent as $t): ?>
-
+                    <thead>
                         <tr>
-
-                            <td class="ticket-no">
-                                <?= e($t['ticket_number'] ?? '') ?>
-                            </td>
-
-                            <td>
-                                <strong>
-                                    <?= e($t['title'] ?? '') ?>
-                                </strong>
-
-                                <small class="table-sub">
-                                    <?= e($t['category'] ?? '') ?>
-                                </small>
-                            </td>
-
-                            <td>
-                                <span class="priority <?= e(strtolower($t['priority'] ?? '')) ?>">
-                                    <?= e($t['priority'] ?? '') ?>
-                                </span>
-                            </td>
-
-                            <td>
-                                <span class="status">
-                                    <?= e($t['status'] ?? '') ?>
-                                </span>
-                            </td>
-
-                            <td>
-                                <?php
-                                $createdAt = strtotime($t['created_at'] ?? '');
-
-                                echo $createdAt
-                                    ? e(date('M j, Y', $createdAt))
-                                    : 'N/A';
-                                ?>
-                            </td>
-
-                            <td>
-                                <a
-                                    class="text-link"
-                                    href="ticket_view.php?id=<?= (int) $t['id'] ?>"
-                                >
-                                    View
-                                </a>
-                            </td>
-
+                            <th>Ticket Number</th>
+                            <th>Title</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Assigned IT Staff</th>
+                            <th>Date Submitted</th>
+                            <th>Action</th>
                         </tr>
+                    </thead>
 
-                    <?php endforeach; ?>
+                    <tbody>
 
-                <?php endif; ?>
+                        <?php foreach ($recentTickets as $ticket): ?>
 
-            </tbody>
+                            <?php
+                            $priority = strtolower(
+                                trim($ticket['priority'] ?? 'low')
+                            );
 
-        </table>
+                            $status = strtolower(
+                                trim($ticket['status'] ?? '')
+                            );
 
-    </div>
+                            $statusClass = str_replace(
+                                [' ', '_'],
+                                '-',
+                                $status
+                            );
 
-</div>
+                            $dateSubmitted = !empty($ticket['created_at'])
+                                ? date(
+                                    'M d, Y',
+                                    strtotime($ticket['created_at'])
+                                )
+                                : 'N/A';
+                            ?>
+
+                            <tr>
+
+                                <td>
+                                    <span class="user-ticket-number">
+                                        <?= e($ticket['ticket_number']) ?>
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <strong class="user-ticket-title">
+                                        <?= e($ticket['title']) ?>
+                                    </strong>
+                                </td>
+
+                                <td>
+                                    <span class="user-priority <?= e($priority) ?>">
+                                        <?= e(ucfirst($priority)) ?>
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span class="user-status <?= e($statusClass) ?>">
+                                        <?= e($ticket['status']) ?>
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <?= e(
+                                        $ticket['assignee_name']
+                                        ?: 'Not yet assigned'
+                                    ) ?>
+                                </td>
+
+                                <td>
+                                    <?= e($dateSubmitted) ?>
+                                </td>
+
+                                <td>
+                                    <a
+                                        href="ticket_view.php?id=<?= (int) $ticket['id'] ?>"
+                                        class="user-action-link"
+                                    >
+                                        View Details →
+                                    </a>
+                                </td>
+
+                            </tr>
+
+                        <?php endforeach; ?>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        <?php endif; ?>
+
+    </section>
+
+
+    <!-- =====================================
+         ACCOUNT SECTION
+    ====================================== -->
+
+    <section class="user-account-section">
+
+        <div class="user-content-card account-card">
+
+            <div class="account-information">
+
+                <div class="account-icon">
+                    <span>♙</span>
+                </div>
+
+                <div>
+                    <span class="section-label">
+                        ACCOUNT SETTINGS
+                    </span>
+
+                    <h2>Manage Your Account</h2>
+
+                    <p>
+                        Update your personal information
+                        and manage your account password.
+                    </p>
+                </div>
+
+            </div>
+
+            <a href="profile.php" class="user-secondary-btn">
+                My Profile
+                <span>→</span>
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================
+         QUICK INFORMATION
+    ====================================== -->
+
+    <section class="user-quick-info">
+
+        <div class="quick-info-item">
+            <span class="quick-info-icon">✓</span>
+
+            <div>
+                <strong>Track Your Requests</strong>
+                <p>Monitor your ticket status anytime.</p>
+            </div>
+        </div>
+
+        <div class="quick-info-item">
+            <span class="quick-info-icon">+</span>
+
+            <div>
+                <strong>Need IT Assistance?</strong>
+                <p>Submit a support ticket whenever needed.</p>
+            </div>
+        </div>
+
+    </section>
+
+</main>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

@@ -1,10 +1,10 @@
-
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/admin_helpers.php';
 
 require_admin();
 
-$pdo = db();
+$pdo  = db();
 $user = current_user();
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -14,7 +14,6 @@ if (!$id || $id <= 0) {
     exit('Invalid ticket ID.');
 }
 
-// Fetch ticket information.
 $stmt = $pdo->prepare("
     SELECT
         t.*,
@@ -26,7 +25,6 @@ $stmt = $pdo->prepare("
     WHERE t.id = ?
     LIMIT 1
 ");
-
 $stmt->execute([$id]);
 $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -35,189 +33,137 @@ if (!$ticket) {
     exit('Ticket not found.');
 }
 
-$error = '';
+$currentAssigned = $ticket['assigned_to'] !== null ? (int) $ticket['assigned_to'] : null;
+$requesterId     = !empty($ticket['requester_id']) ? (int) $ticket['requester_id'] : null;
 
-// Handle form submissions.
+$error        = '';
+$commentDraft = '';
+
+/* ---------- Form handling ---------- */
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     verify_csrf();
 
     $action = $_POST['action'] ?? '';
 
-    // Add comment.
+    /* Add comment */
     if ($action === 'comment') {
 
-        $comment = trim($_POST['comment'] ?? '');
+        $commentDraft = trim($_POST['comment'] ?? '');
 
-        if ($comment === '') {
+        if ($commentDraft === '') {
             $error = 'Comment cannot be empty.';
         } else {
 
-            $stmt = $pdo->prepare("
-                INSERT INTO ticket_comments
-                    (ticket_id, user_id, comment)
-                VALUES (?, ?, ?)
-            ");
+            $pdo->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)")
+                ->execute([$id, $user['id'], $commentDraft]);
 
-            $stmt->execute([
-                $id,
-                $user['id'],
-                $comment
-            ]);
+            // Tell the requester and the assignee, but never the person who just commented.
+            $recipients = array_unique(array_filter([$requesterId, $currentAssigned]));
 
-            if ((int)$ticket['requester_id'] !== (int)$user['id']) {
-                notify_user(
-                    $pdo,
-                    (int)$ticket['requester_id'],
-                    'Ticket update',
-                    'A new comment was added to ' . $ticket['ticket_number']
-                );
+            foreach ($recipients as $recipientId) {
+                if ($recipientId !== (int) $user['id']) {
+                    notify_user(
+                        $pdo,
+                        $recipientId,
+                        'Ticket update',
+                        'A new comment was added to ' . $ticket['ticket_number']
+                    );
+                }
             }
 
-            log_audit(
-                $pdo,
-                (int)$user['id'],
-                'Ticket comment',
-                $ticket['ticket_number']
-            );
-
+            log_audit($pdo, (int) $user['id'], 'Ticket comment', $ticket['ticket_number']);
             flash('success', 'Comment added successfully.');
-
             redirect('ticket_view.php?id=' . $id);
         }
     }
 
-    // Update ticket information.
+    /* Update ticket */
     elseif ($action === 'update') {
 
-        $newStatus = $_POST['status'] ?? $ticket['status'];
+        $newStatus   = $_POST['status'] ?? $ticket['status'];
         $newPriority = $_POST['priority'] ?? $ticket['priority'];
-
-        $assignedInput = $_POST['assigned_to'] ?? '';
-
-        $assigned = $assignedInput === ''
-            ? null
-            : filter_var($assignedInput, FILTER_VALIDATE_INT);
+        $assignedRaw = $_POST['assigned_to'] ?? '';
+        $assigned    = $assignedRaw === '' ? null : filter_var($assignedRaw, FILTER_VALIDATE_INT);
 
         if (
             !in_array($newStatus, ticket_statuses(), true) ||
             !in_array($newPriority, priorities(), true) ||
-            ($assignedInput !== '' && $assigned === false)
+            ($assignedRaw !== '' && $assigned === false)
         ) {
             $error = 'Invalid ticket information.';
-        } else {
+        }
 
-            // Validate assigned staff account.
-            if ($assigned !== null) {
+        // Only validate the staff account when the assignee is actually changing.
+        // (Re-saving a ticket that is assigned to a since-deactivated user must not fail or silently unassign.)
+        if ($error === '' && $assigned !== null && $assigned !== $currentAssigned) {
 
-                $staffCheck = $pdo->prepare("
-                    SELECT u.id
-                    FROM users u
-                    INNER JOIN roles r ON r.id = u.role_id
-                    WHERE u.id = ?
-                      AND u.is_active = 1
-                      AND r.name IN ('admin', 'it_staff')
-                    LIMIT 1
-                ");
+            $staffCheck = $pdo->prepare("
+                SELECT u.id
+                FROM users u
+                INNER JOIN roles r ON r.id = u.role_id
+                WHERE u.id = ? AND u.is_active = 1 AND r.name IN ('admin', 'it_staff')
+                LIMIT 1
+            ");
+            $staffCheck->execute([$assigned]);
 
-                $staffCheck->execute([$assigned]);
-
-                if (!$staffCheck->fetchColumn()) {
-                    $error = 'Selected staff account is invalid or inactive.';
-                }
+            if (!$staffCheck->fetchColumn()) {
+                $error = 'Selected staff account is invalid or inactive.';
             }
+        }
 
-            if ($error === '') {
+        if ($error === '') {
+
+            $statusChanged   = $newStatus !== $ticket['status'];
+            $priorityChanged = $newPriority !== $ticket['priority'];
+            $assignChanged   = $assigned !== $currentAssigned;
+
+            if (!$statusChanged && !$priorityChanged && !$assignChanged) {
+                $error = 'No changes to save.';
+            } else {
 
                 $pdo->beginTransaction();
 
                 try {
+                    if ($statusChanged) {
+                        log_history($pdo, $id, $user['id'], 'status', $ticket['status'], $newStatus);
+                    }
 
-                    // Record status changes.
-                    if ($newStatus !== $ticket['status']) {
+                    if ($priorityChanged) {
+                        log_history($pdo, $id, $user['id'], 'priority', $ticket['priority'], $newPriority);
+                    }
+
+                    if ($assignChanged) {
                         log_history(
-                            $pdo,
-                            $id,
-                            $user['id'],
-                            'status',
-                            $ticket['status'],
-                            $newStatus
+                            $pdo, $id, $user['id'], 'assigned_to',
+                            $currentAssigned === null ? null : (string) $currentAssigned,
+                            $assigned === null ? null : (string) $assigned
                         );
                     }
 
-                    // Record priority changes.
-                    if ($newPriority !== $ticket['priority']) {
-                        log_history(
-                            $pdo,
-                            $id,
-                            $user['id'],
-                            'priority',
-                            $ticket['priority'],
-                            $newPriority
-                        );
+                    $pdo->prepare("UPDATE tickets SET status = ?, priority = ?, assigned_to = ? WHERE id = ?")
+                        ->execute([$newStatus, $newPriority, $assigned, $id]);
+
+                    if ($assignChanged && $assigned !== null && $assigned !== (int) $user['id']) {
+                        notify_user($pdo, $assigned, 'Ticket assigned', 'You have been assigned ticket ' . $ticket['ticket_number']);
                     }
 
-                    // Record assignment changes.
-                    $oldAssigned = $ticket['assigned_to'] === null
-                        ? null
-                        : (string)$ticket['assigned_to'];
-
-                    $newAssigned = $assigned === null
-                        ? null
-                        : (string)$assigned;
-
-                    if ($oldAssigned !== $newAssigned) {
-
-                        log_history(
-                            $pdo,
-                            $id,
-                            $user['id'],
-                            'assigned_to',
-                            $oldAssigned,
-                            $newAssigned
-                        );
-                    }
-
-                    // Save ticket changes.
-                    $update = $pdo->prepare("
-                        UPDATE tickets
-                        SET status = ?,
-                            priority = ?,
-                            assigned_to = ?
-                        WHERE id = ?
-                    ");
-
-                    $update->execute([
-                        $newStatus,
-                        $newPriority,
-                        $assigned,
-                        $id
-                    ]);
-
-                    // Notify newly assigned staff.
-                    if (
-                        $assigned !== null &&
-                        $assigned !== (int)($ticket['assigned_to'] ?? 0)
-                    ) {
+                    // Let the requester know when the status moves.
+                    if ($statusChanged && $requesterId !== null && $requesterId !== (int) $user['id']) {
                         notify_user(
                             $pdo,
-                            $assigned,
-                            'Ticket assigned',
-                            'You have been assigned ticket ' . $ticket['ticket_number']
+                            $requesterId,
+                            'Ticket status changed',
+                            $ticket['ticket_number'] . ' is now ' . $newStatus
                         );
                     }
 
-                    log_audit(
-                        $pdo,
-                        (int)$user['id'],
-                        'Ticket updated',
-                        $ticket['ticket_number']
-                    );
+                    log_audit($pdo, (int) $user['id'], 'Ticket updated', $ticket['ticket_number']);
 
                     $pdo->commit();
 
                     flash('success', 'Ticket updated successfully.');
-
                     redirect('ticket_view.php?id=' . $id);
 
                 } catch (Throwable $exception) {
@@ -227,7 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     error_log($exception->getMessage());
-
                     $error = 'Unable to update ticket. Please check the server error log.';
                 }
             }
@@ -235,399 +180,243 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch comments.
+/* ---------- Page data ---------- */
+
 $commentQuery = $pdo->prepare("
-    SELECT
-        c.*,
-        CONCAT_WS(' ', u.first_name, u.last_name) AS author,
-        r.name AS role
+    SELECT c.*, CONCAT_WS(' ', u.first_name, u.last_name) AS author, r.name AS role
     FROM ticket_comments c
     INNER JOIN users u ON u.id = c.user_id
     LEFT JOIN roles r ON r.id = u.role_id
     WHERE c.ticket_id = ?
     ORDER BY c.created_at ASC
 ");
-
 $commentQuery->execute([$id]);
 $comments = $commentQuery->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch activity history.
+// Resolve assignee IDs stored in history to real names.
 $historyQuery = $pdo->prepare("
     SELECT
         h.*,
-        CONCAT_WS(' ', u.first_name, u.last_name) AS actor
+        CONCAT_WS(' ', u.first_name, u.last_name)   AS actor,
+        CONCAT_WS(' ', uo.first_name, uo.last_name) AS old_name,
+        CONCAT_WS(' ', un.first_name, un.last_name) AS new_name
     FROM ticket_history h
-    LEFT JOIN users u ON u.id = h.changed_by
+    LEFT JOIN users u  ON u.id = h.changed_by
+    LEFT JOIN users uo ON h.field_changed = 'assigned_to' AND uo.id = CAST(h.old_value AS UNSIGNED)
+    LEFT JOIN users un ON h.field_changed = 'assigned_to' AND un.id = CAST(h.new_value AS UNSIGNED)
     WHERE h.ticket_id = ?
-    ORDER BY h.created_at DESC
+    ORDER BY h.created_at DESC, h.id DESC
 ");
-
 $historyQuery->execute([$id]);
 $history = $historyQuery->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch active Admin and IT Staff accounts.
-$staffQuery = $pdo->query("
-    SELECT
-        u.id,
-        CONCAT_WS(' ', u.first_name, u.last_name) AS name
+// Active staff, plus the current assignee even if they were deactivated (so the select never silently unassigns).
+$staffQuery = $pdo->prepare("
+    SELECT u.id, u.is_active, CONCAT_WS(' ', u.first_name, u.last_name) AS name
     FROM users u
     INNER JOIN roles r ON r.id = u.role_id
-    WHERE r.name IN ('admin', 'it_staff')
-      AND u.is_active = 1
+    WHERE (r.name IN ('admin', 'it_staff') AND u.is_active = 1)
+       OR u.id = ?
     ORDER BY name ASC
 ");
-
+$staffQuery->execute([$currentAssigned ?? 0]);
 $staff = $staffQuery->fetchAll(PDO::FETCH_ASSOC);
 
-$pageTitle = 'Ticket Details';
+/** Friendly rendering of a history value (assignee IDs → names). */
+$historyValue = static function (array $item, string $side): string {
+    $raw  = $item[$side . '_value'] ?? null;
+    $name = trim((string) ($item[$side . '_name'] ?? ''));
 
+    if ($item['field_changed'] === 'assigned_to') {
+        if ($raw === null || $raw === '') {
+            return 'Unassigned';
+        }
+        return $name !== '' ? $name : 'User #' . $raw;
+    }
+
+    return ($raw === null || $raw === '') ? '—' : (string) $raw;
+};
+
+$pageTitle = 'Ticket Details';
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="back-row">
-    <a class="text-link" href="tickets.php">
-        ← Back to Tickets
-    </a>
+<div class="admin-page">
 
-    <span class="ticket-no">
-        <?= e($ticket['ticket_number']) ?>
-    </span>
-</div>
-
-<?php if ($error): ?>
-    <div class="alert error">
-        <?= e($error) ?>
+    <div class="back-row">
+        <a class="text-link" href="tickets.php">← Back to Tickets</a>
+        <span class="ticket-no"><?= e($ticket['ticket_number']) ?></span>
     </div>
-<?php endif; ?>
 
-<div class="ticket-layout">
+    <?php if ($error): ?>
+        <div class="alert error" role="alert"><?= e($error) ?></div>
+    <?php endif; ?>
 
-    <!-- MAIN COLUMN -->
-    <div class="main-column">
+    <div class="ticket-layout">
 
-        <!-- TICKET DETAILS -->
-        <div class="form-card">
+        <!-- MAIN COLUMN -->
+        <div class="main-column">
 
-            <div class="ticket-title-row">
-
-                <div>
-                    <span class="eyebrow">
-                        <?= e($ticket['category'] ?? 'Support Request') ?>
-                    </span>
-
-                    <h2><?= e($ticket['title']) ?></h2>
-
-                    <p class="muted">
-                        Submitted by
-                        <?= e($ticket['requester'] ?: 'Unknown') ?>
-
-                        ·
-
-                        <?= e(date(
-                            'M j, Y g:i A',
-                            strtotime($ticket['created_at'])
-                        )) ?>
-                    </p>
-                </div>
-
-                <span class="priority <?= strtolower(e($ticket['priority'])) ?>">
-                    <?= e($ticket['priority']) ?>
-                </span>
-
-            </div>
-
-            <div class="description">
-                <?= nl2br(e($ticket['description'])) ?>
-            </div>
-
-        </div>
-
-        <!-- CONVERSATION -->
-        <div class="form-card">
-
-            <div class="card-heading">
-                <h2>Conversation</h2>
-                <p class="muted">
-                    Comments and updates for this ticket.
-                </p>
-            </div>
-
-            <div class="comment-list">
-
-                <?php if (empty($comments)): ?>
-                    <p class="empty">No comments yet.</p>
-                <?php endif; ?>
-
-                <?php foreach ($comments as $comment): ?>
-
-                    <div class="comment">
-
-                        <div class="comment-avatar">
-                            <?= e(strtoupper(substr($comment['author'] ?: 'U', 0, 1))) ?>
-                        </div>
-
-                        <div class="comment-body">
-
-                            <div class="comment-meta">
-
-                                <strong>
-                                    <?= e($comment['author'] ?: 'Unknown User') ?>
-                                </strong>
-
-                                <span>
-                                    <?= e($comment['role'] ?? '') ?>
-                                    ·
-                                    <?= e(date(
-                                        'M j, Y g:i A',
-                                        strtotime($comment['created_at'])
-                                    )) ?>
-                                </span>
-
-                            </div>
-
-                            <p>
-                                <?= nl2br(e($comment['comment'])) ?>
-                            </p>
-
-                        </div>
-
+            <div class="form-card">
+                <div class="ticket-title-row">
+                    <div>
+                        <span class="eyebrow"><?= e($ticket['category'] ?? 'Support Request') ?></span>
+                        <h2><?= e($ticket['title']) ?></h2>
+                        <p class="muted">
+                            Submitted by <?= e($ticket['requester'] ?: 'Unknown') ?>
+                            · <?= e(fmt_dt($ticket['created_at'])) ?>
+                        </p>
                     </div>
-
-                <?php endforeach; ?>
-
-            </div>
-
-            <!-- ADD COMMENT -->
-            <form method="POST" class="form-stack comment-form">
-
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="<?= e(csrf_token()) ?>"
-                >
-
-                <input
-                    type="hidden"
-                    name="action"
-                    value="comment"
-                >
-
-                <label>
-                    Add a comment
-
-                    <textarea
-                        name="comment"
-                        rows="3"
-                        required
-                        placeholder="Write an update or ask a question..."
-                    ></textarea>
-                </label>
-
-                <div class="form-actions">
-                    <button type="submit" class="btn primary">
-                        Post Comment
-                    </button>
+                    <?= badge('priority', $ticket['priority']) ?>
                 </div>
 
-            </form>
-
-        </div>
-
-        <!-- ACTIVITY HISTORY -->
-        <div class="form-card">
-
-            <div class="card-heading">
-                <h2>Activity History</h2>
-                <p class="muted">
-                    Recorded changes for this ticket.
-                </p>
+                <!-- No nl2br(): .description uses white-space: pre-wrap, so nl2br would double every line break. -->
+                <div class="description"><?= e($ticket['description']) ?></div>
             </div>
 
-            <?php if (empty($history)): ?>
+            <div class="form-card">
+                <div class="card-heading">
+                    <h2>Conversation</h2>
+                    <p>Comments and updates for this ticket.</p>
+                </div>
 
-                <p class="muted">
-                    No recorded changes.
-                </p>
+                <div class="comment-list">
+                    <?php if (!$comments): ?>
+                        <p class="empty">No comments yet.</p>
+                    <?php endif; ?>
 
-            <?php else: ?>
-
-                <div class="history-list">
-
-                    <?php foreach ($history as $item): ?>
-
-                        <div class="history-item">
-
-                            <span class="history-dot"></span>
-
-                            <div>
-
-                                <strong>
-                                    <?= e($item['field_changed']) ?> changed
-                                </strong>
-
-                                <p>
-                                    <?= e($item['old_value'] ?? '—') ?>
-                                    →
-                                    <?= e($item['new_value'] ?? '—') ?>
-                                </p>
-
-                                <small>
-                                    <?= e($item['actor'] ?: 'System') ?>
-
-                                    ·
-
-                                    <?= e(date(
-                                        'M j, Y g:i A',
-                                        strtotime($item['created_at'])
-                                    )) ?>
-                                </small>
-
+                    <?php foreach ($comments as $comment): ?>
+                        <div class="comment">
+                            <div class="comment-avatar" aria-hidden="true">
+                                <?= e(strtoupper(substr($comment['author'] ?: 'U', 0, 1))) ?>
                             </div>
 
+                            <div class="comment-body">
+                                <div class="comment-meta">
+                                    <strong><?= e($comment['author'] ?: 'Unknown User') ?></strong>
+                                    <span><?= e(role_label($comment['role'] ?? '')) ?> · <?= e(fmt_dt($comment['created_at'])) ?></span>
+                                </div>
+                                <p><?= nl2br(e($comment['comment'])) ?></p>
+                            </div>
                         </div>
-
                     <?php endforeach; ?>
-
                 </div>
 
-            <?php endif; ?>
+                <form method="POST" class="form-stack comment-form">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="comment">
+
+                    <label>
+                        Add a comment
+                        <textarea name="comment" rows="3" required placeholder="Write an update or ask a question..."><?= e($commentDraft) ?></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn primary">Post Comment</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="form-card">
+                <div class="card-heading">
+                    <h2>Activity History</h2>
+                    <p>Recorded changes for this ticket.</p>
+                </div>
+
+                <?php if (!$history): ?>
+                    <p class="muted">No recorded changes.</p>
+                <?php else: ?>
+                    <div class="history-list">
+                        <?php foreach ($history as $item): ?>
+                            <div class="history-item">
+                                <span class="history-dot" aria-hidden="true"></span>
+                                <div>
+                                    <strong><?= e(ucfirst(str_replace('_', ' ', $item['field_changed']))) ?> changed</strong>
+                                    <p><?= e($historyValue($item, 'old')) ?> → <?= e($historyValue($item, 'new')) ?></p>
+                                    <small><?= e($item['actor'] ?: 'System') ?> · <?= e(fmt_dt($item['created_at'])) ?></small>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
 
         </div>
 
+        <!-- SIDE COLUMN -->
+        <aside class="side-column">
+
+            <div class="form-card">
+                <h3>Ticket Information</h3>
+
+                <div class="detail-pair">
+                    <span>Ticket Number</span>
+                    <strong><?= e($ticket['ticket_number']) ?></strong>
+                </div>
+                <div class="detail-pair">
+                    <span>Status</span>
+                    <?= badge('status', $ticket['status']) ?>
+                </div>
+                <div class="detail-pair">
+                    <span>Priority</span>
+                    <?= badge('priority', $ticket['priority']) ?>
+                </div>
+                <div class="detail-pair">
+                    <span>Assigned To</span>
+                    <strong><?= e(trim($ticket['assignee'] ?? '') ?: 'Unassigned') ?></strong>
+                </div>
+                <div class="detail-pair">
+                    <span>Last Updated</span>
+                    <strong><?= e(fmt_dt($ticket['updated_at'])) ?></strong>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <h3>Manage Ticket</h3>
+
+                <form method="POST" class="form-stack">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="update">
+
+                    <label>
+                        Assign To
+                        <select name="assigned_to">
+                            <option value="">Unassigned</option>
+                            <?php foreach ($staff as $member): ?>
+                                <option
+                                    value="<?= (int) $member['id'] ?>"
+                                    <?= $currentAssigned === (int) $member['id'] ? 'selected' : '' ?>
+                                >
+                                    <?= e($member['name']) ?><?= (int) $member['is_active'] ? '' : ' (inactive)' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+
+                    <label>
+                        Status
+                        <select name="status">
+                            <?php foreach (ticket_statuses() as $s): ?>
+                                <option value="<?= e($s) ?>" <?= $ticket['status'] === $s ? 'selected' : '' ?>><?= e($s) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+
+                    <label>
+                        Priority
+                        <select name="priority">
+                            <?php foreach (priorities() as $p): ?>
+                                <option value="<?= e($p) ?>" <?= $ticket['priority'] === $p ? 'selected' : '' ?>><?= e($p) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+
+                    <button type="submit" class="btn primary full">Save Changes</button>
+                </form>
+            </div>
+
+        </aside>
     </div>
-
-    <!-- SIDE COLUMN -->
-    <aside class="side-column">
-
-        <!-- TICKET INFORMATION -->
-        <div class="form-card">
-
-            <h3>Ticket Information</h3>
-
-            <div class="detail-pair">
-                <span>Ticket Number</span>
-                <strong><?= e($ticket['ticket_number']) ?></strong>
-            </div>
-
-            <div class="detail-pair">
-                <span>Status</span>
-                <strong><?= e($ticket['status']) ?></strong>
-            </div>
-
-            <div class="detail-pair">
-                <span>Priority</span>
-                <strong><?= e($ticket['priority']) ?></strong>
-            </div>
-
-            <div class="detail-pair">
-                <span>Assigned To</span>
-                <strong>
-                    <?= e($ticket['assignee'] ?: 'Unassigned') ?>
-                </strong>
-            </div>
-
-            <div class="detail-pair">
-                <span>Last Updated</span>
-                <strong>
-                    <?= e(date(
-                        'M j, Y g:i A',
-                        strtotime($ticket['updated_at'])
-                    )) ?>
-                </strong>
-            </div>
-
-        </div>
-
-        <!-- MANAGE TICKET -->
-        <div class="form-card">
-
-            <h3>Manage Ticket</h3>
-
-            <form method="POST" class="form-stack">
-
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="<?= e(csrf_token()) ?>"
-                >
-
-                <input
-                    type="hidden"
-                    name="action"
-                    value="update"
-                >
-
-                <label>
-                    Assign To
-
-                    <select name="assigned_to">
-
-                        <option value="">
-                            Unassigned
-                        </option>
-
-                        <?php foreach ($staff as $member): ?>
-
-                            <option
-                                value="<?= (int)$member['id'] ?>"
-                                <?= (int)$ticket['assigned_to'] === (int)$member['id'] ? 'selected' : '' ?>
-                            >
-                                <?= e($member['name']) ?>
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-                </label>
-
-                <label>
-                    Status
-
-                    <select name="status">
-
-                        <?php foreach (ticket_statuses() as $status): ?>
-
-                            <option
-                                value="<?= e($status) ?>"
-                                <?= $ticket['status'] === $status ? 'selected' : '' ?>
-                            >
-                                <?= e($status) ?>
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-                </label>
-
-                <label>
-                    Priority
-
-                    <select name="priority">
-
-                        <?php foreach (priorities() as $priority): ?>
-
-                            <option
-                                value="<?= e($priority) ?>"
-                                <?= $ticket['priority'] === $priority ? 'selected' : '' ?>
-                            >
-                                <?= e($priority) ?>
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-                </label>
-
-                <button type="submit" class="btn primary full">
-                    Save Changes
-                </button>
-
-            </form>
-
-        </div>
-
-    </aside>
-
 </div>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
