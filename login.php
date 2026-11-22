@@ -1,5 +1,6 @@
- 
+
 <?php
+
 require_once __DIR__ . '/includes/bootstrap.php';
 
 /**
@@ -8,21 +9,19 @@ require_once __DIR__ . '/includes/bootstrap.php';
 function get_dashboard_path($user): ?string
 {
     $role = strtolower(trim($user['role'] ?? ''));
-
-    // Normalize role names.
     $role = str_replace([' ', '-'], '_', $role);
 
     $dashboards = [
-        'admin' => '/erp-helpdesk/admin/dashboard.php',
+        'admin'    => '/erp-helpdesk/admin/dashboard.php',
         'it_staff' => '/erp-helpdesk/it_staff/dashboard.php',
-        'user' => '/erp-helpdesk/user/dashboard.php'
+        'user'     => '/erp-helpdesk/user/dashboard.php'
     ];
 
     return $dashboards[$role] ?? null;
 }
 
 /**
- * Redirect an authenticated user to their dashboard.
+ * Redirect authenticated users to their dashboard.
  */
 function redirect_user_to_dashboard($user): void
 {
@@ -33,26 +32,19 @@ function redirect_user_to_dashboard($user): void
         exit;
     }
 
-    // Invalid role: clear the session instead of redirecting
-    // repeatedly between login and dashboard.
     unset($_SESSION['user']);
 }
 
-// If already logged in, go directly to the correct dashboard.
+/* Redirect logged-in users. */
 $loggedInUser = current_user();
 
 if ($loggedInUser) {
-    $dashboard = get_dashboard_path($loggedInUser);
-
-    if ($dashboard !== null) {
-        redirect_user_to_dashboard($loggedInUser);
-    }
-
-    unset($_SESSION['user']);
+    redirect_user_to_dashboard($loggedInUser);
 }
 
 $error = '';
 
+/* PROCESS LOGIN */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     verify_csrf();
@@ -80,23 +72,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user && password_verify($password, $user['password'])) {
 
-        // Determine dashboard before creating the session.
         $dashboard = get_dashboard_path($user);
 
         if ($dashboard === null) {
-            $error = 'Your account has an unrecognized role. Please contact your administrator.';
+
+            $error = 'Invalid account role. Contact your administrator.';
+
         } else {
 
-            // Secure session after successful authentication.
+            /* Regenerate session ID after successful authentication. */
             session_regenerate_id(true);
 
+            /* Store authenticated user information. */
             $_SESSION['user'] = [
-                'id' => (int) $user['id'],
-                'name' => $user['full_name'],
+                'id'    => (int) $user['id'],
+                'name'  => $user['full_name'],
                 'email' => $user['email'],
-                'role' => $user['role']
+                'role'  => $user['role']
             ];
 
+            /* Record login activity. */
             log_audit(
                 db(),
                 (int) $user['id'],
@@ -104,125 +99,299 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'User logged in.'
             );
 
-            // Redirect according to account role.
+            /* Redirect according to account role. */
             header('Location: ' . $dashboard);
             exit;
         }
 
     } else {
-        $error = 'Incorrect email or password, or your account is inactive.';
+
+        $error = 'Incorrect email or password, or inactive account.';
+
     }
 }
+
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Sign in | IT Help Desk</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="/erp-helpdesk/assets/css/style.css">
+    <meta name="theme-color"
+          content="#102744">
+
+    <title>Sign In | IT Help Desk</title>
+
+    <!-- LOGIN STYLESHEETS -->
+    <link rel="stylesheet"
+          href="/erp-helpdesk/assets/css/base.css">
+
+    <link rel="stylesheet"
+          href="/erp-helpdesk/assets/css/login.css">
+
 </head>
 
 <body class="auth-body">
 
 <div class="auth-layout">
 
-    <div class="auth-art">
+    <!-- BACKGROUND AND BRANDING -->
+    <section class="auth-art"
+             aria-label="IT Help Desk branding">
 
         <div class="auth-brand">
+
             <span class="brand-mark">HD</span>
-            IT Help Desk
+
+            <div class="brand-text">
+
+                <strong>IT HELP DESK</strong>
+
+                <small>
+                    TICKETING MANAGEMENT SYSTEM
+                </small>
+
+            </div>
+
         </div>
 
-        <div class="auth-message">
-            <span class="eyebrow light">IT SUPPORT PORTAL</span>
+    </section>
 
-            <h1>Technology support, made simpler.</h1>
 
-            <p>
-                Submit requests, follow progress, and get back to what matters.
-            </p>
-        </div>
-
-        <div class="auth-foot">
-            A centralized space for IT assistance.
-        </div>
-
-    </div>
-
-    <div class="auth-panel">
+    <!-- LOGIN SECTION -->
+    <main class="auth-panel">
 
         <div class="auth-form-wrap">
 
-            <span class="eyebrow">WELCOME BACK</span>
+            <!-- LOGIN HEADING -->
+            <div class="login-heading">
 
-            <h2>Sign in to your account</h2>
+                <span class="eyebrow">
+                    WELCOME BACK
+                </span>
 
-            <p class="muted">
-                Enter your account details to continue.
-            </p>
+                <h2>Sign In</h2>
 
+                <p>
+                    Sign in to continue.
+                </p>
+
+            </div>
+
+
+            <!-- ERROR MESSAGE -->
             <?php if ($error): ?>
-                <div class="alert error">
+
+                <div class="alert error"
+                     role="alert"
+                     aria-live="polite">
+
+                    <span class="alert-icon">!</span>
+
                     <?= e($error) ?>
+
                 </div>
+
             <?php endif; ?>
 
+
+            <!-- FLASH MESSAGE -->
             <?php show_flash(); ?>
 
-            <form method="POST" class="form-stack">
 
+            <!-- LOGIN FORM -->
+            <form method="POST"
+                  action=""
+                  class="form-stack">
+
+                <!-- CSRF TOKEN -->
                 <input
                     type="hidden"
                     name="csrf_token"
                     value="<?= e(csrf_token()) ?>"
                 >
 
-                <label>
-                    Email address
 
-                    <input
-                        type="email"
-                        name="email"
-                        required
-                        autocomplete="username"
-                        placeholder="name@example.com"
-                        value="<?= e($_POST['email'] ?? '') ?>"
-                    >
-                </label>
+                <!-- EMAIL FIELD -->
+                <div class="auth-field">
 
-                <label>
-                    Password
+                    <label for="email">
+                        Email Address
+                    </label>
 
-                    <input
-                        type="password"
-                        name="password"
-                        required
-                        autocomplete="current-password"
-                        placeholder="Enter your password"
-                    >
-                </label>
+                    <div class="input-wrapper">
 
-                <button class="btn primary full" type="submit">
-                    Sign in <span>→</span>
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true">
+
+                            <rect
+                                x="3"
+                                y="5"
+                                width="18"
+                                height="14"
+                                rx="2"
+                            />
+
+                            <path d="m3 7 9 6 9-6"/>
+
+                        </svg>
+
+                        <input
+                            id="email"
+                            type="email"
+                            name="email"
+                            required
+                            autocomplete="username"
+                            placeholder="Enter your email"
+                            value="<?= e($_POST['email'] ?? '') ?>"
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <!-- PASSWORD FIELD -->
+                <div class="auth-field">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <div class="password-field input-wrapper">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true">
+
+                            <rect
+                                x="3"
+                                y="10"
+                                width="18"
+                                height="11"
+                                rx="2"
+                            />
+
+                            <path d="M7 10V7a5 5 0 0 1 10 0v3"/>
+
+                        </svg>
+
+                        <input
+                            id="password"
+                            type="password"
+                            name="password"
+                            required
+                            autocomplete="current-password"
+                            placeholder="Enter your password"
+                        >
+
+                        <button
+                            class="password-toggle"
+                            type="button"
+                            data-toggle-password
+                            aria-controls="password"
+                            aria-label="Show password"
+                            aria-pressed="false">
+
+                            Show
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- SIGN IN BUTTON -->
+                <button
+                    class="btn primary full login-submit"
+                    type="submit">
+
+                    <span>Sign In</span>
+
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true">
+
+                        <path d="M5 12h14"/>
+                        <path d="m13 6 6 6-6 6"/>
+
+                    </svg>
+
                 </button>
 
             </form>
 
-            <p class="auth-help">
-                First time setup? Ask your administrator to create your account.
-            </p>
+
+            <!-- LOGIN FOOTER -->
+            <div class="login-bottom">
+
+                <div class="secure-note">
+
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true">
+
+                        <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/>
+
+                        <path d="m9 12 2 2 4-4"/>
+
+                    </svg>
+
+                    <span>Secure Login</span>
+
+                </div>
+
+                <p>
+                    Need an account? Contact your administrator.
+                </p>
+
+            </div>
 
         </div>
 
-    </div>
+
+        <!-- COPYRIGHT -->
+        <div class="auth-copyright">
+
+            &copy; <?= date('Y') ?> IT Help Desk.
+            All rights reserved.
+
+        </div>
+
+    </main>
 
 </div>
 
+
+<!-- JAVASCRIPT -->
 <script src="/erp-helpdesk/assets/js/app.js"></script>
 
 </body>

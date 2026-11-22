@@ -1,4 +1,4 @@
- 
+
 <?php
 $user = current_user();
 $pageTitle = $pageTitle ?? 'Dashboard';
@@ -21,7 +21,13 @@ $isAdmin = function_exists('is_admin') && is_admin();
 
     <title><?= e($pageTitle) ?> | IT Help Desk</title>
 
+    <!-- Shared stylesheet -->
     <link rel="stylesheet" href="/erp-helpdesk/assets/css/style.css">
+
+    <!-- Admin-only stylesheet -->
+    <?php if ($isAdmin): ?>
+        <link rel="stylesheet" href="/erp-helpdesk/assets/css/admin.css">
+    <?php endif; ?>
 </head>
 
 <body>
